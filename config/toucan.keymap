@@ -1,82 +1,318 @@
+/*
+ * beekeeb Toucan2, 36-key build (3x5+3 + trackpad) — ZMK.
+ * Ported 1:1 from mbastar/zmk-config-cornemini2 @ 3edd0a3 (config/corne.keymap).
+ *
+ * Why the port is nearly free: both boards are 42-slot keymap arrays with the
+ * outer pinky columns unpopulated, and both have six thumb keys at positions
+ * 36-41. So bindings, home-row-mod behaviors, and position-referenced combos
+ * all carry over unchanged. Only the trackpad forces changes — see TRACKPAD.
+ *
+ * TRACKPAD (this is the whole delta from the Corne Mini):
+ *   - toucan.dtsi's `is_touching_processor` fires `&mo 4` for as long as a finger
+ *     is on the pad. Layer 4 is therefore NOT a toggled mouse layer here — it is
+ *     a live "finger is down" layer, so everything on it must be `&trans` except
+ *     the click keys. `&tog MOUSE` is gone from ADJ for the same reason.
+ *   - `trackpad_listener`'s `scroller` node scrolls while layers <1 2> are active,
+ *     i.e. while NAV or SYM is held. NAV=1 and SYM=2 here already — no change.
+ *     Order matters: hold the thumb FIRST, then touch, or the thumb reads as a click.
+ *   - Modifier-click (cmd-click, shift-click) needs a DELIBERATE hold on the
+ *     home-row mod before touching. A trackpad click is not a key position, so
+ *     `hold-trigger-key-positions` can't resolve the hold from the click; the
+ *     mod only engages once the tapping term expires on its own (200 ms index /
+ *     280 ms pinky). `require-prior-idle-ms` also means you must pause briefly
+ *     after typing. This is the real cost of cross-hand HRMs on a trackpad board.
+ */
+
 #include <behaviors.dtsi>
-#include <dt-bindings/zmk/keys.h>
 #include <dt-bindings/zmk/bt.h>
+#include <dt-bindings/zmk/keys.h>
 #include <dt-bindings/zmk/outputs.h>
 #include <dt-bindings/zmk/pointing.h>
 
-#define BASE 0
-#define NAV  1
-#define SYM  2
-#define ADJ  3
+#define DEF   0
+#define NAV   1
+#define SYM   2
+#define ADJ   3
+#define TOUCH 4   /* index is fixed: toucan.dtsi hardcodes `&mo 4` on touch */
+
+/* Layer-taps sit on BSPC and DEL, which you sometimes want to hold to repeat.
+   quick-tap-ms restores that: tap, then press-and-hold again within 200 ms and
+   it repeats the tap instead of entering the layer. */
+&lt { quick-tap-ms = <200>; };
+
+/* 42-slot matrix; outer columns (0, 11, 12, 23, 24, 35) are unpopulated on the 36.
+   Left:  0-5   12-17  24-29  thumbs 36 37 38
+   Right: 6-11  18-23  30-35  thumbs 39 40 41 */
+
+#define LEFT_KEYS   0 1 2 3 4 5 12 13 14 15 16 17 24 25 26 27 28 29
+#define RIGHT_KEYS  6 7 8 9 10 11 18 19 20 21 22 23 30 31 32 33 34 35
+#define LEFT_THUMB  36 37 38
+#define RIGHT_THUMB 39 40 41
 
 / {
+    behaviors {
+        /* Home-row mods. Cross-hand only: a left-hand mod fires only if a RIGHT-hand
+           key follows, which is what stops "df" turning into ctrl+d.
+
+           Three tiers, tuned by how often the TAP character is typed -- not by
+           which finger it is. Misfire risk scales with tap frequency; the cost of
+           a hard hold scales with how often you need the mod. */
+
+        /* Index + middle (D F J K -> CTRL, SHIFT). Pressed mid-roll, so the hold
+           has to be easy to get: shorter term, prior-idle 80 rather than 150
+           because that guard was eating Shift right after a letter -- the
+           "f/ instead of ?" failure. */
+        hmli: home_row_mod_left_index {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "balanced";
+            tapping-term-ms = <200>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <80>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <RIGHT_KEYS RIGHT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        hmri: home_row_mod_right_index {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "balanced";
+            tapping-term-ms = <200>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <80>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <LEFT_KEYS LEFT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        /* Ring + pinky (S L ' -> ALT, ALT, GUI). ALT stays fast because
+           option-arrow and option-backspace are mid-flow editing gestures;
+           ' stays fast because it is the only source of Cmd for every
+           left-hand letter. */
+        hml: home_row_mod_left {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "balanced";
+            tapping-term-ms = <280>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <150>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <RIGHT_KEYS RIGHT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        hmr: home_row_mod_right {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "balanced";
+            tapping-term-ms = <280>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <150>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <LEFT_KEYS LEFT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        /* Left pinky only (A -> GUI). tap-preferred resolves as HOLD only when the
+           280 ms term actually expires, no matter what else is pressed -- so "an",
+           "and", "man", "a " can no longer become Cmd-N or Cmd-Space. 'a' is ~8%
+           of English letters, which is why this key needs the guard; ' is under
+           0.3%, which is why the right pinky does not. */
+        hmlp: home_row_mod_left_pinky {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "tap-preferred";
+            tapping-term-ms = <280>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <150>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <RIGHT_KEYS RIGHT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        caps: caps {
+            compatible = "zmk,behavior-caps-word";
+            #binding-cells = <0>;
+            continue-list = <MINUS UNDERSCORE BACKSPACE>;
+        };
+    };
+
     conditional_layers {
         compatible = "zmk,conditional-layers";
+
         tri_layer {
-            if-layers = <1 2>;
-            then-layer = <3>;
+            if-layers = <NAV SYM>;
+            then-layer = <ADJ>;
         };
+    };
+
+    combos {
+        compatible = "zmk,combos";
+
+        screenshot {
+            bindings = <&kp LG(LS(N4))>;
+            key-positions = <1 25>;
+            layers = <DEF>;
+        }; /* Q + Z */
+        dictation {
+            bindings = <&kp F13>;
+            key-positions = <32 33>;
+            layers = <DEF>;
+        }; /* , + . -> F13 (Raycast dictation). Deliberately not right-GUI:
+              VoiceInk listens for a bare right-GUI tap, so every cross-hand Cmd
+              from the `'` home-row mod flashed the dictation window. */
+        lpar {
+            bindings = <&kp LPAR>;
+            key-positions = <4 5>;
+            layers = <DEF>;
+        }; /* R + T */
+        rpar {
+            bindings = <&kp RPAR>;
+            key-positions = <6 7>;
+            layers = <DEF>;
+        }; /* Y + U */
+        lbkt {
+            bindings = <&kp LBKT>;
+            key-positions = <16 17>;
+            layers = <DEF>;
+        }; /* F + G */
+        rbkt {
+            bindings = <&kp RBKT>;
+            key-positions = <18 19>;
+            layers = <DEF>;
+        }; /* H + J */
+        lbrc {
+            bindings = <&kp LBRC>;
+            key-positions = <28 29>;
+            layers = <DEF>;
+        }; /* V + B */
+        rbrc {
+            bindings = <&kp RBRC>;
+            key-positions = <30 31>;
+            layers = <DEF>;
+        }; /* N + M */
+
+        capsword {
+            bindings = <&caps>;
+            key-positions = <16 19>;
+        };  /* F + J -> caps word (replaces the Shift key this board has no room for) */
+        plus {
+            bindings = <&kp PLUS>;
+            key-positions = <16 17>;
+            layers = <SYM>;
+        };  /* SYM: - and = together -> +. `+` is otherwise unreachable by any
+               gesture: `=` lives only on SYM, Shift lives only on DEF's home-row
+               mods and NAV, and holding SYM turns the F/Shift key into `-`.
+               Scoped to SYM so F+G on base is still `[`. Known risk: typing `-=`
+               fast. Fix is `timeout-ms = <30>;` here, NOT require-prior-idle-ms. */
+        del {
+            bindings = <&kp DEL>;
+            key-positions = <27 28>;
+        };  /* C + V -> DEL. "cv" is in no English word; the V overlap with V+B
+               resolves on which keys are actually down. */
     };
 
     keymap {
         compatible = "zmk,keymap";
 
-        base {
-            display-name = "BASE";
+        DEF {
+            display-name = "Base";
+
+            // |  Q  |  W  |  E  |  R  |  T  |   |  Y  |  U  |  I  |  O  |  P  |
+            // |  A  |  S  |  D  |  F  |  G  |   |  H  |  J  |  K  |  L  |  '  |  home-row mods
+            // |  Z  |  X  |  C  |  V  |  B  |   |  N  |  M  |  ,  |  .  |  /  |
+            //         | TAB | ENT | ESC/NAV |   | BSPC/SYM | SPC | DEL/SYM |
+
             bindings = <
-                &kp TAB   &kp Q &kp W &kp E &kp R &kp T   &kp Y &kp U  &kp I     &kp O   &kp P    &kp BSPC
-                &kp LCTRL &kp A &kp S &kp D &kp F &kp G   &kp H &kp J  &kp K     &kp L   &kp SEMI &kp SQT
-                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B   &kp N &kp M  &kp COMMA &kp DOT &kp FSLH &kp ESC
-                                &kp LGUI &mo 1 &kp SPACE   &kp RET &mo 2 &kp RALT
+&trans  &kp Q         &kp W        &kp E          &kp R          &kp T          &kp Y         &kp U          &kp I          &kp O        &kp P          &trans
+&trans  &hmlp LGUI A  &hml LALT S  &hmli LCTRL D  &hmli LSHFT F  &kp G          &kp H         &hmri RSHFT J  &hmri RCTRL K  &hmr RALT L  &hmr RGUI SQT  &trans
+&trans  &kp Z         &kp X        &kp C          &kp V          &kp B          &kp N         &kp M          &kp COMMA      &kp DOT      &kp FSLH       &trans
+                                   &kp TAB        &kp RET        &lt NAV ESC    &lt SYM BSPC  &kp SPACE      &lt SYM DEL
             >;
         };
 
-        nav {
-            display-name = "NAV";
+        NAV {
+            display-name = "Nav/Num";
+
+            // |  1  |  2  |  3  |  4  |  5  |   |  6  |  7   |  8   |  9  |  0  |
+            // | GUI | ALT | CTL | SFT |     |   |  <- |  v   |  ^   |  -> | END |
+            // |     |     |     |     |     |   | PGUP| PGDN | HOME |     | DEL |
+            //   Holding this layer also turns the trackpad into a scroll surface.
+
             bindings = <
-                &kp TAB     &kp N1          &kp N2       &kp N3       &kp N4       &kp N5         &kp N6   &kp N7   &kp N8 &kp N9    &kp N0 &kp BSPC
-                &bt BT_CLR  &bt BT_SEL 0    &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4   &kp LEFT &kp DOWN &kp UP &kp RIGHT &trans &trans
-                &kp LSHFT   &studio_unlock  &trans       &trans       &trans       &trans         &trans   &trans   &trans &trans    &trans &trans
-                                                &kp LGUI     &trans       &kp SPACE      &kp RET  &trans   &kp RALT
+&trans  &kp N1    &kp N2    &kp N3     &kp N4     &kp N5    &kp N6     &kp N7     &kp N8    &kp N9     &kp N0   &trans
+&trans  &kp LGUI  &kp LALT  &kp LCTRL  &kp LSHFT  &trans    &kp LEFT   &kp DOWN   &kp UP    &kp RIGHT  &kp END  &trans
+&trans  &trans    &trans    &trans     &trans     &trans    &kp PG_UP  &kp PG_DN  &kp HOME  &trans     &kp DEL  &trans
+                            &trans     &trans     &trans    &trans     &trans     &trans
             >;
         };
 
-        sym {
-            display-name = "SYM";
+        SYM {
+            display-name = "Sym/Fn";
+
+            // |  !  |  @  |  #  |  $  |  %  |   | F7 | F8 | F9 | F10 |  :  |
+            // |  ^  |  &  |  *  |  -  |  =  |   | F4 | F5 | F6 | F11 |  ;  |
+            // |  _  |  `  |  ~  |  \  | "|" |   | F1 | F2 | F3 | F12 | DEL |
+            //   combo: - + =  ->  +     |     also a trackpad scroll layer
+
             bindings = <
-                &kp TAB   &kp EXCL &kp AT &kp HASH &kp DLLR &kp PRCNT   &kp CARET &kp AMPS  &kp KP_MULTIPLY &kp LPAR &kp RPAR &kp BSPC
-                &kp LCTRL &trans   &trans &trans   &trans   &trans      &kp MINUS &kp EQUAL &kp LBKT        &kp RBKT &kp BSLH &kp GRAVE
-                &kp LSHFT &trans   &trans &trans   &trans   &trans      &kp UNDER &kp PLUS  &kp LBRC        &kp RBRC &kp PIPE &kp TILDE
-                                          &kp LGUI &trans   &kp SPACE   &kp RET   &trans    &kp RALT
+&trans  &kp EXCL   &kp AT     &kp HASH   &kp DLLR   &kp PRCNT    &kp F7  &kp F8  &kp F9  &kp F10  &kp COLON  &trans
+&trans  &kp CARET  &kp AMPS   &kp ASTRK  &kp MINUS  &kp EQUAL    &kp F4  &kp F5  &kp F6  &kp F11  &kp SEMI   &trans
+&trans  &kp UNDER  &kp GRAVE  &kp TILDE  &kp BSLH   &kp PIPE     &kp F1  &kp F2  &kp F3  &kp F12  &kp DEL    &trans
+                              &trans     &trans     &trans       &trans  &trans  &trans
             >;
         };
 
-        adj {
-            display-name = "ADJ";
+        ADJ {
+            display-name = "System";
+
+            // reached by holding NAV + SYM together (conditional layer)
+            // |     |     |     |     |        |   |     |     |     |      |      |
+            // | BT0 | BT1 | BT2 |BTCLR| STUDIO |   | USB | BLE |     |      |      |
+            // | BOOT|RESET|     |     |BTCLRA  |   |     |     |     |RESET | BOOT |
+            //
+            // &bootloader / &sys_reset are SOURCE-SPECIFIC on a split: each only
+            // affects the half it is physically pressed on, so both halves need
+            // their own. (Combos are the exception -- a combo always fires on the
+            // central/left half, so a combo cannot recover the right half.)
+            //
+            // &out USB/BLE closes the endpoint-mismatch gap: if the board is on
+            // both USB and BLE, ZMK Studio only connects on the matching endpoint.
+
             bindings = <
-                &mo TAB   &trans &kp F7 &kp F8 &kp F9 &kp F12   &kp C_VOL_DN &kp C_MUTE  &kp C_VOL_UP &trans &trans &kp BSPC
-                &kp LCTRL &trans &kp F4 &kp F5 &kp F6 &kp F11   &trans       &trans      &trans       &trans &trans &trans
-                &bt LSHFT &trans &kp F1 &kp F2 &kp F3 &kp F10   &trans       &trans      &trans       &trans &trans &trans
-                                   &kp LGUI &mo NAV &kp SPACE   &kp RET &mo 2 &kp RALT
+&trans  &trans        &trans        &trans        &trans      &trans            &trans         &trans         &trans  &trans      &trans       &trans
+&trans  &bt BT_SEL 0  &bt BT_SEL 1  &bt BT_SEL 2  &bt BT_CLR  &studio_unlock    &out OUT_USB   &out OUT_BLE   &trans  &trans      &trans       &trans
+&trans  &bootloader   &sys_reset    &trans        &trans      &bt BT_CLR_ALL    &trans         &trans         &trans  &sys_reset  &bootloader  &trans
+                                    &trans        &trans      &trans            &trans         &trans         &trans
             >;
         };
 
-        mouse {
-            display-name = "MOU";
+        TOUCH {
+            display-name = "Touch";
+
+            // Live while a finger is on the trackpad (toucan.dtsi -> `&mo 4`).
+            // Everything must stay &trans so typing still falls through to base;
+            // only the thumbs become clicks. Right thumbs are the ones under the
+            // clicking hand, so LCLK sits on the inner right thumb.
+
             bindings = <
-                &trans &trans &trans &trans &trans &trans           &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans           &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans           &trans &trans &trans &trans &trans &trans
-                            &mkp MCLK &mkp LCLK &mkp RCLK           &mkp LCLK &mkp RCLK &mkp MCLK
+&trans  &trans  &trans  &trans     &trans     &trans        &trans     &trans     &trans     &trans  &trans  &trans
+&trans  &trans  &trans  &trans     &trans     &trans        &trans     &trans     &trans     &trans  &trans  &trans
+&trans  &trans  &trans  &trans     &trans     &trans        &trans     &trans     &trans     &trans  &trans  &trans
+                        &mkp MCLK  &mkp LCLK  &mkp RCLK     &mkp LCLK  &mkp RCLK  &mkp MCLK
             >;
         };
 
-        extra_2 {
-                status = "reserved";
-        };
+        /* Empty slots so ZMK Studio can hand out extra layers with no rebuild. */
 
-        extra_3 {
-                status = "reserved";
-        };
+        extra1 { status = "reserved"; };
+
+        extra2 { status = "reserved"; };
     };
 };
