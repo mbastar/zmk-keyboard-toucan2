@@ -18,9 +18,13 @@
  *   - Modifier-click (cmd-click, shift-click) needs a DELIBERATE hold on the
  *     home-row mod before touching. A trackpad click is not a key position, so
  *     `hold-trigger-key-positions` can't resolve the hold from the click; the
- *     mod only engages once the tapping term expires on its own (200 ms index /
- *     280 ms pinky). `require-prior-idle-ms` also means you must pause briefly
- *     after typing. This is the real cost of cross-hand HRMs on a trackpad board.
+ *     mod only engages once the tapping term expires on its own (per-key terms
+ *     in the behaviors block). `require-prior-idle-ms` also means you must pause
+ *     briefly after typing (except A, which has no idle guard since 2026-09-10).
+ *     This is the real cost of cross-hand HRMs on a trackpad board.
+ *
+ * HRM TUNING LOG: internal-systems/infrastructure/keyboards/toucan2/hrm-tuning.md
+ *   in the vault — the verified hold-tap model, the tests, and what is deferred.
  */
 
 #include <behaviors.dtsi>
@@ -37,8 +41,12 @@
 
 /* Layer-taps sit on BSPC and DEL, which you sometimes want to hold to repeat.
    quick-tap-ms restores that: tap, then press-and-hold again within 200 ms and
-   it repeats the tap instead of entering the layer. */
-&lt { quick-tap-ms = <200>; };
+   it repeats the tap instead of entering the layer.
+   require-prior-idle-ms (2026-09-10): SYM sits on Backspace, which is pressed
+   mid-typing constantly. With no idle guard the stock flavor commits to the
+   layer on the next keypress and types a symbol instead of a letter. 100 ms =
+   no layer inside a typing roll, still instant after any pause. */
+&lt { quick-tap-ms = <200>; require-prior-idle-ms = <100>; };
 
 /* 42-slot matrix; outer columns (0, 11, 12, 23, 24, 35) are unpopulated on the 36.
    Left:  0-5   12-17  24-29  thumbs 36 37 38
@@ -91,12 +99,19 @@
         /* Ring + pinky (S L ' -> ALT, ALT, GUI). ALT stays fast because
            option-arrow and option-backspace are mid-flow editing gestures;
            ' stays fast because it is the only source of Cmd for every
-           left-hand letter. */
+           left-hand letter.
+
+           2026-09-10: hml term 280 -> 350. For a balanced cross-hand mod the
+           term only governs same-hand and solo holds -- the intended cross-hand
+           chords resolve on interrupt and never see it. Word-initial "se" after
+           a pause was crossing 280 ms before E released and firing Opt-E (the
+           ´ dead key). hmr stays at 280 on purpose: L+E is cross-hand, so a
+           longer term cannot help it, and ' is almost never solo-held. */
         hml: home_row_mod_left {
             compatible = "zmk,behavior-hold-tap";
             #binding-cells = <2>;
             flavor = "balanced";
-            tapping-term-ms = <280>;
+            tapping-term-ms = <350>;
             quick-tap-ms = <175>;
             require-prior-idle-ms = <150>;
             bindings = <&kp>, <&kp>;
@@ -119,17 +134,25 @@
         };
 
         /* Left pinky only (A -> GUI). tap-preferred resolves as HOLD only when the
-           280 ms term actually expires, no matter what else is pressed -- so "an",
+           term actually expires, no matter what else is pressed -- so "an",
            "and", "man", "a " can no longer become Cmd-N or Cmd-Space. 'a' is ~8%
            of English letters, which is why this key needs the guard; ' is under
-           0.3%, which is why the right pinky does not. */
+           0.3%, which is why the right pinky does not.
+
+           2026-09-10 retune: the timer is this key's ONLY hold path, so the
+           term is felt on every Cmd -- 200 not 280. require-prior-idle-ms
+           150 -> 0: it turned A into an instant tap whenever paste followed
+           typing ("xxav"), and tap-preferred already does the roll protection
+           it was there for. Verified on the board: hold A past the term, tap V
+           any time -> paste; positional does not downgrade a timer-decided
+           hold. New exposure: an 'a' held 200 ms+ with any key pressed is Cmd. */
         hmlp: home_row_mod_left_pinky {
             compatible = "zmk,behavior-hold-tap";
             #binding-cells = <2>;
             flavor = "tap-preferred";
-            tapping-term-ms = <280>;
+            tapping-term-ms = <200>;
             quick-tap-ms = <175>;
-            require-prior-idle-ms = <150>;
+            require-prior-idle-ms = <0>;
             bindings = <&kp>, <&kp>;
 
             hold-trigger-key-positions = <RIGHT_KEYS RIGHT_THUMB>;
