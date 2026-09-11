@@ -145,12 +145,16 @@
            typing ("xxav"), and tap-preferred already does the roll protection
            it was there for. Verified on the board: hold A past the term, tap V
            any time -> paste; positional does not downgrade a timer-decided
-           hold. New exposure: an 'a' held 200 ms+ with any key pressed is Cmd. */
+           hold. New exposure: an 'a' held 200 ms+ with any key pressed is Cmd.
+
+           2026-09-11 round 2: that exposure fired in the wild -- hesitation
+           on 'a' became Cmd. One change per the round cadence: term 200 -> 230.
+           Every deliberate Cmd now takes 230 ms; nothing else moved. */
         hmlp: home_row_mod_left_pinky {
             compatible = "zmk,behavior-hold-tap";
             #binding-cells = <2>;
             flavor = "tap-preferred";
-            tapping-term-ms = <200>;
+            tapping-term-ms = <230>;
             quick-tap-ms = <175>;
             require-prior-idle-ms = <0>;
             bindings = <&kp>, <&kp>;
