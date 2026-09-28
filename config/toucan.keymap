@@ -67,7 +67,7 @@
            which finger it is. Misfire risk scales with tap frequency; the cost of
            a hard hold scales with how often you need the mod. */
 
-        /* Index + middle (D F J K -> CTRL, SHIFT). Pressed mid-roll, so the hold
+        /* Index (F J -> SHIFT; Ctrl split out to hmlc/hmrc 2026-09-28). Pressed mid-roll, so the hold
            has to be easy to get: shorter term, prior-idle 80 rather than 150
            because that guard was eating Shift right after a letter -- the
            "f/ instead of ?" failure. */
@@ -97,7 +97,40 @@
             hold-trigger-on-release;
         };
 
-        /* Ring + pinky (S L ' -> ALT, ALT, GUI). ALT stays fast because
+        /* Middle (D K -> CTRL), split out of hmli/hmri 2026-09-28. Balanced +
+           hold-trigger-on-release has a release path: a cross-hand key pressed
+           AND released while D is still down is a hold, whatever the term -- a
+           lingering "do" became Ctrl-O. tap-preferred has no such path; Ctrl
+           engages only when the term expires. Cost: every Ctrl (C-c, C-o, C-r)
+           is a deliberate 200 ms hold. prior-idle 150 keeps D/K a plain tap
+           inside a typing roll. Positional kept: moot for tap-preferred, harmless. */
+        hmlc: home_row_mod_left_ctrl {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "tap-preferred";
+            tapping-term-ms = <200>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <150>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <RIGHT_KEYS RIGHT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        hmrc: home_row_mod_right_ctrl {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "tap-preferred";
+            tapping-term-ms = <200>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <150>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <LEFT_KEYS LEFT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        /* Ring + pinky (S ' -> ALT, GUI; L split out to hmra 2026-09-28). ALT stays fast because
            option-arrow and option-backspace are mid-flow editing gestures;
            ' stays fast because it is the only source of Cmd for every
            left-hand letter.
@@ -126,6 +159,23 @@
             #binding-cells = <2>;
             flavor = "balanced";
             tapping-term-ms = <280>;
+            quick-tap-ms = <175>;
+            require-prior-idle-ms = <150>;
+            bindings = <&kp>, <&kp>;
+
+            hold-trigger-key-positions = <LEFT_KEYS LEFT_THUMB>;
+            hold-trigger-on-release;
+        };
+
+        /* Right ring (L -> ALT), split out of hmr 2026-09-28 -- the same release
+           path: "li" -> Opt-I (ˆ), "le" -> Opt-E (´). tap-preferred, so a
+           right-hand Alt is a deliberate 200 ms hold. ' stays on balanced hmr:
+           '+V is the designed fast paste. */
+        hmra: home_row_mod_right_alt {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "tap-preferred";
+            tapping-term-ms = <200>;
             quick-tap-ms = <175>;
             require-prior-idle-ms = <150>;
             bindings = <&kp>, <&kp>;
@@ -274,7 +324,7 @@
 
             bindings = <
 &trans  &kp Q         &kp W        &kp E          &kp R          &kp T          &kp Y         &kp U          &kp I          &kp O        &kp P          &trans
-&trans  &hmlp LGUI A  &hml LALT S  &hmli LCTRL D  &hmli LSHFT F  &kp G          &kp H         &hmri RSHFT J  &hmri RCTRL K  &hmr RALT L  &hmr RGUI SQT  &trans
+&trans  &hmlp LGUI A  &hml LALT S  &hmlc LCTRL D  &hmli LSHFT F  &kp G          &kp H         &hmri RSHFT J  &hmrc RCTRL K  &hmra RALT L  &hmr RGUI SQT  &trans
 &trans  &kp Z         &kp X        &kp C          &kp V          &kp B          &kp N         &kp M          &kp COMMA      &kp DOT      &kp FSLH       &trans
                                    &kp TAB        &kp RET        &lt NAV ESC    &lt SYM BSPC  &kp SPACE      &ltarw ARROW DEL
             >;
