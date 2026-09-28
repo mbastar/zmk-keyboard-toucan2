@@ -38,8 +38,9 @@
 #define SYM   2
 #define ADJ   3
 #define TOUCH 4   /* index is fixed: toucan.dtsi hardcodes `&mo 4` on touch */
+#define ARROW 5
 
-/* Layer-taps sit on BSPC and DEL, which you sometimes want to hold to repeat.
+/* Layer-taps sit on BSPC (DEL's &ltarw carries its own quick-tap), which you sometimes want to hold to repeat.
    quick-tap-ms restores that: tap, then press-and-hold again within 200 ms and
    it repeats the tap instead of entering the layer.
    require-prior-idle-ms (2026-09-10): SYM sits on Backspace, which is pressed
@@ -163,6 +164,21 @@
             hold-trigger-on-release;
         };
 
+        /* Outer right thumb: tap DEL, hold ARROW (2026-09-28; replaced a duplicate
+           SYM hold). Balanced, not &lt's tap-preferred default: a quick thumb+arrow
+           chord must resolve to the layer, never DEL plus a letter. No prior-idle
+           guard: arrows get reached for right after typing, and a guard would turn
+           that into a forward-delete. quick-tap keeps DEL repeatable (tap, then hold). */
+        ltarw: layer_tap_arrows {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "balanced";
+            tapping-term-ms = <200>;
+            quick-tap-ms = <200>;
+            bindings = <&mo>, <&kp>;
+            display-name = "Del/Arrows";
+        };
+
         caps: caps {
             compatible = "zmk,behavior-caps-word";
             #binding-cells = <0>;
@@ -254,13 +270,13 @@
             // |  Q  |  W  |  E  |  R  |  T  |   |  Y  |  U  |  I  |  O  |  P  |
             // |  A  |  S  |  D  |  F  |  G  |   |  H  |  J  |  K  |  L  |  '  |  home-row mods
             // |  Z  |  X  |  C  |  V  |  B  |   |  N  |  M  |  ,  |  .  |  /  |
-            //         | TAB | ENT | ESC/NAV |   | BSPC/SYM | SPC | DEL/SYM |
+            //         | TAB | ENT | ESC/NAV |   | BSPC/SYM | SPC | DEL/ARW |
 
             bindings = <
 &trans  &kp Q         &kp W        &kp E          &kp R          &kp T          &kp Y         &kp U          &kp I          &kp O        &kp P          &trans
 &trans  &hmlp LGUI A  &hml LALT S  &hmli LCTRL D  &hmli LSHFT F  &kp G          &kp H         &hmri RSHFT J  &hmri RCTRL K  &hmr RALT L  &hmr RGUI SQT  &trans
 &trans  &kp Z         &kp X        &kp C          &kp V          &kp B          &kp N         &kp M          &kp COMMA      &kp DOT      &kp FSLH       &trans
-                                   &kp TAB        &kp RET        &lt NAV ESC    &lt SYM BSPC  &kp SPACE      &lt SYM DEL
+                                   &kp TAB        &kp RET        &lt NAV ESC    &lt SYM BSPC  &kp SPACE      &ltarw ARROW DEL
             >;
         };
 
@@ -333,6 +349,25 @@
 &trans  &trans  &trans  &trans     &trans     &trans        &trans     &trans     &trans     &trans  &trans  &trans
 &trans  &trans  &trans  &trans     &trans     &trans        &trans     &trans     &trans     &trans  &trans  &trans
                         &mkp MCLK  &mkp LCLK  &mkp RCLK     &mkp LCLK  &mkp RCLK  &mkp MCLK
+            >;
+        };
+
+        ARROW {
+            display-name = "Arrows";
+
+            // Hold the outer right thumb (tap = DEL). Same-hand arrows in an inverted T;
+            // plain mods on the left home row, so shift/opt/cmd-arrow skip HRM timing.
+            // TAB / ENT / BSPC on the right for one-handed list and form driving.
+            // Trial 2026-09-28: NAV keeps its arrows until this layer wins or loses.
+            // |     |     |     |     |     |   | TAB | HOME |  UP  |  END  | BSPC |
+            // | GUI | ALT | CTL | SFT |     |   | ENT | LEFT | DOWN | RIGHT |      |
+            // |     |     |     |     |     |   |     | PGUP | PGDN |       |      |
+
+            bindings = <
+&trans  &trans    &trans    &trans     &trans     &trans    &kp TAB  &kp HOME   &kp UP     &kp END    &kp BSPC  &trans
+&trans  &kp LGUI  &kp LALT  &kp LCTRL  &kp LSHFT  &trans    &kp RET  &kp LEFT   &kp DOWN   &kp RIGHT  &trans    &trans
+&trans  &trans    &trans    &trans     &trans     &trans    &trans   &kp PG_UP  &kp PG_DN  &trans     &trans    &trans
+                            &trans     &trans     &trans    &trans   &trans     &trans
             >;
         };
 
